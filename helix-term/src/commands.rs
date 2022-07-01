@@ -264,6 +264,7 @@ impl MappableCommand {
         code_action, "Perform code action",
         buffer_picker, "Open buffer picker",
         symbol_picker, "Open symbol picker",
+        select_references_to_symbol_under_cursor, "Select symbol references",
         workspace_symbol_picker, "Open workspace symbol picker",
         diagnostics_picker, "Open diagnostic picker",
         workspace_diagnostics_picker, "Open workspace diagnostic picker",
@@ -4656,8 +4657,6 @@ fn replay_macro(cx: &mut Context) {
         return;
     }
 
-    cx.editor.macro_replaying.push(reg);
-
     let keys: Vec<KeyEvent> = if let Some([keys_str]) = cx.editor.registers.read(reg) {
         match helix_view::input::parse_macro(keys_str) {
             Ok(keys) => keys,
@@ -4671,6 +4670,10 @@ fn replay_macro(cx: &mut Context) {
         return;
     };
 
+    // Once the macro has been fully validated, it's marked as being under replay
+    // to ensure we don't fall into infinite recursion.
+    cx.editor.macro_replaying.push(reg);
+
     let count = cx.count();
     cx.callback = Some(Box::new(move |compositor, cx| {
         for _ in 0..count {
@@ -4678,7 +4681,9 @@ fn replay_macro(cx: &mut Context) {
                 compositor.handle_event(crossterm::event::Event::Key(key.into()), cx);
             }
         }
+        // The macro under replay is cleared at the end of the callback, not in the
+        // macro replay context, or it will not correctly protect the user from
+        // replaying recursively.
+        cx.editor.macro_replaying.pop();
     }));
-
-    cx.editor.macro_replaying.pop();
 }
