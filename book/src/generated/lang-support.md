@@ -10,9 +10,11 @@
 | cpon | ✓ |  | ✓ |  |
 | cpp | ✓ | ✓ | ✓ | `clangd` |
 | css | ✓ |  |  | `vscode-css-language-server` |
+| cue | ✓ |  |  | `cuelsp` |
 | dart | ✓ |  | ✓ | `dart` |
 | devicetree | ✓ |  | ✓ |  |
 | dockerfile | ✓ |  |  | `docker-langserver` |
+| dot | ✓ |  |  | `dot-language-server` |
 | edoc | ✓ |  |  |  |
 | eex | ✓ |  |  |  |
 | ejs | ✓ |  |  |  |
@@ -30,24 +32,25 @@
 | git-diff | ✓ |  |  |  |
 | git-ignore | ✓ |  |  |  |
 | git-rebase | ✓ |  |  |  |
-| gleam | ✓ | ✓ |  |  |
+| gleam | ✓ | ✓ |  | `gleam` |
 | glsl | ✓ | ✓ | ✓ |  |
 | go | ✓ | ✓ | ✓ | `gopls` |
 | gomod | ✓ |  |  | `gopls` |
+| gotmpl | ✓ |  |  | `gopls` |
 | gowork | ✓ |  |  | `gopls` |
 | graphql | ✓ |  |  |  |
 | hare | ✓ |  | ✓ |  |
 | haskell | ✓ |  |  | `haskell-language-server-wrapper` |
 | hcl | ✓ |  | ✓ | `terraform-ls` |
-| heex | ✓ |  |  |  |
+| heex | ✓ | ✓ |  |  |
 | html | ✓ |  |  | `vscode-html-language-server` |
 | idris |  |  |  | `idris2-lsp` |
 | iex | ✓ |  |  |  |
 | java | ✓ |  |  | `jdtls` |
-| javascript | ✓ |  | ✓ | `typescript-language-server` |
+| javascript | ✓ | ✓ | ✓ | `typescript-language-server` |
 | jsdoc | ✓ |  |  |  |
 | json | ✓ |  | ✓ | `vscode-json-language-server` |
-| jsx | ✓ |  | ✓ | `typescript-language-server` |
+| jsx | ✓ | ✓ | ✓ | `typescript-language-server` |
 | julia | ✓ |  |  | `julia` |
 | kotlin | ✓ |  |  | `kotlin-language-server` |
 | latex | ✓ |  |  | `texlab` |
@@ -66,7 +69,7 @@
 | nu | ✓ |  |  |  |
 | ocaml | ✓ |  | ✓ | `ocamllsp` |
 | ocaml-interface | ✓ |  |  | `ocamllsp` |
-| odin | ✓ |  |  |  |
+| odin | ✓ |  |  | `ols` |
 | openscad | ✓ |  |  | `openscad-language-server` |
 | org | ✓ |  |  |  |
 | perl | ✓ | ✓ | ✓ |  |
@@ -96,9 +99,9 @@
 | tfvars |  |  |  | `terraform-ls` |
 | toml | ✓ |  |  | `taplo` |
 | tsq | ✓ |  |  |  |
-| tsx | ✓ |  |  | `typescript-language-server` |
+| tsx | ✓ | ✓ | ✓ | `typescript-language-server` |
 | twig | ✓ |  |  |  |
-| typescript | ✓ |  | ✓ | `typescript-language-server` |
+| typescript | ✓ | ✓ | ✓ | `typescript-language-server` |
 | ungrammar | ✓ |  |  |  |
 | v | ✓ |  |  | `vls` |
 | vala | ✓ |  |  | `vala-language-server` |
