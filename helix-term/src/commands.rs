@@ -4559,7 +4559,7 @@ fn shell_impl(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    if input.is_some() {
+    if input.is_some() || cfg!(windows) {
         process.stdin(Stdio::piped());
     }
 
@@ -4846,7 +4846,7 @@ fn replay_macro(cx: &mut Context) {
     cx.callback = Some(Box::new(move |compositor, cx| {
         for _ in 0..count {
             for &key in keys.iter() {
-                compositor.handle_event(crossterm::event::Event::Key(key.into()), cx);
+                compositor.handle_event(compositor::Event::Key(key), cx);
             }
         }
         // The macro under replay is cleared at the end of the callback, not in the
