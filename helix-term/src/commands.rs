@@ -33,6 +33,7 @@ use helix_view::{
     info::Info,
     input::KeyEvent,
     keyboard::KeyCode,
+    tree,
     view::View,
     Document, DocumentId, Editor, ViewId,
 };
@@ -246,7 +247,8 @@ impl MappableCommand {
         extend_search_prev, "Add previous search match to selection",
         search_selection, "Use current selection as search pattern",
         global_search, "Global search in workspace folder",
-        extend_line, "Select current line, if already selected, extend to next line",
+        extend_line, "Select current line, if already selected, extend to another line based on the anchor",
+        extend_line_below, "Select current line, if already selected, extend to next line",
         extend_line_above, "Select current line, if already selected, extend to previous line",
         extend_to_line_bounds, "Extend selection to line bounds",
         shrink_to_line_bounds, "Shrink selection to line bounds",
@@ -875,8 +877,8 @@ fn goto_window(cx: &mut Context, align: Align) {
     let last_line = view.last_line(doc);
 
     let line = match align {
-        Align::Top => (view.offset.row + scrolloff + count),
-        Align::Center => (view.offset.row + ((last_line - view.offset.row) / 2)),
+        Align::Top => view.offset.row + scrolloff + count,
+        Align::Center => view.offset.row + ((last_line - view.offset.row) / 2),
         Align::Bottom => last_line.saturating_sub(scrolloff + count),
     }
     .max(view.offset.row + scrolloff)
@@ -1944,6 +1946,15 @@ enum Extend {
 }
 
 fn extend_line(cx: &mut Context) {
+    let (view, doc) = current_ref!(cx.editor);
+    let extend = match doc.selection(view.id).primary().direction() {
+        Direction::Forward => Extend::Below,
+        Direction::Backward => Extend::Above,
+    };
+    extend_line_impl(cx, extend);
+}
+
+fn extend_line_below(cx: &mut Context) {
     extend_line_impl(cx, Extend::Below);
 }
 
@@ -1959,20 +1970,32 @@ fn extend_line_impl(cx: &mut Context, extend: Extend) {
     let selection = doc.selection(view.id).clone().transform(|range| {
         let (start_line, end_line) = range.line_range(text.slice(..));
 
-        let start = text.line_to_char(start_line);
-        let end = text.line_to_char((end_line + count).min(text.len_lines()));
+        let start = text.line_to_char(match extend {
+            Extend::Above => start_line.saturating_sub(count),
+            Extend::Below => start_line,
+        });
+        let end = text.line_to_char(
+            match extend {
+                Extend::Above => end_line + 1, // the start of next line
+                Extend::Below => (end_line + count),
+            }
+            .min(text.len_lines()),
+        );
 
         // extend to previous/next line if current line is selected
         let (anchor, head) = if range.from() == start && range.to() == end {
             match extend {
-                Extend::Above => (end, text.line_to_char(start_line.saturating_sub(1))),
+                Extend::Above => (end, text.line_to_char(start_line.saturating_sub(count + 1))),
                 Extend::Below => (
                     start,
                     text.line_to_char((end_line + count + 1).min(text.len_lines())),
                 ),
             }
         } else {
-            (start, end)
+            match extend {
+                Extend::Above => (end, start),
+                Extend::Below => (start, end),
+            }
         };
 
         Range::new(anchor, head)
@@ -3368,13 +3391,7 @@ enum Paste {
     Cursor,
 }
 
-fn paste_impl(
-    values: &[String],
-    doc: &mut Document,
-    view: &View,
-    action: Paste,
-    count: usize,
-) -> Option<Transaction> {
+fn paste_impl(values: &[String], doc: &mut Document, view: &View, action: Paste, count: usize) {
     let repeat = std::iter::repeat(
         values
             .last()
@@ -3417,8 +3434,17 @@ fn paste_impl(
         };
         (pos, pos, values.next())
     });
+    doc.apply(&transaction, view.id);
+}
 
-    Some(transaction)
+pub(crate) fn paste_bracketed_value(cx: &mut Context, contents: String) {
+    let count = cx.count();
+    let (view, doc) = current!(cx.editor);
+    let paste = match doc.mode {
+        Mode::Insert | Mode::Select => Paste::Cursor,
+        Mode::Normal => Paste::Before,
+    };
+    paste_impl(&[contents], doc, view, paste, count);
 }
 
 fn paste_clipboard_impl(
@@ -3428,18 +3454,11 @@ fn paste_clipboard_impl(
     count: usize,
 ) -> anyhow::Result<()> {
     let (view, doc) = current!(editor);
-
-    match editor
-        .clipboard_provider
-        .get_contents(clipboard_type)
-        .map(|contents| paste_impl(&[contents], doc, view, action, count))
-    {
-        Ok(Some(transaction)) => {
-            doc.apply(&transaction, view.id);
-            doc.append_changes_to_history(view.id);
+    match editor.clipboard_provider.get_contents(clipboard_type) {
+        Ok(contents) => {
+            paste_impl(&[contents], doc, view, action, count);
             Ok(())
         }
-        Ok(None) => Ok(()),
         Err(e) => Err(e.context("Couldn't get system clipboard contents")),
     }
 }
@@ -3552,11 +3571,8 @@ fn paste(cx: &mut Context, pos: Paste) {
     let (view, doc) = current!(cx.editor);
     let registers = &mut cx.editor.registers;
 
-    if let Some(transaction) = registers
-        .read(reg_name)
-        .and_then(|values| paste_impl(values, doc, view, pos, count))
-    {
-        doc.apply(&transaction, view.id);
+    if let Some(values) = registers.read(reg_name) {
+        paste_impl(values, doc, view, pos, count);
     }
 }
 
@@ -4044,13 +4060,18 @@ fn match_brackets(cx: &mut Context) {
 fn jump_forward(cx: &mut Context) {
     let count = cx.count();
     let view = view_mut!(cx.editor);
+    let doc_id = view.doc;
 
     if let Some((id, selection)) = view.jumps.forward(count) {
         view.doc = *id;
         let selection = selection.clone();
         let (view, doc) = current!(cx.editor); // refetch doc
-        doc.set_selection(view.id, selection);
 
+        if doc.id() != doc_id {
+            view.add_to_history(doc_id);
+        }
+
+        doc.set_selection(view.id, selection);
         align_view(doc, view, Align::Center);
     };
 }
@@ -4058,13 +4079,18 @@ fn jump_forward(cx: &mut Context) {
 fn jump_backward(cx: &mut Context) {
     let count = cx.count();
     let (view, doc) = current!(cx.editor);
+    let doc_id = doc.id();
 
     if let Some((id, selection)) = view.jumps.backward(view.id, doc, count) {
         view.doc = *id;
         let selection = selection.clone();
         let (view, doc) = current!(cx.editor); // refetch doc
-        doc.set_selection(view.id, selection);
 
+        if doc.id() != doc_id {
+            view.add_to_history(doc_id);
+        }
+
+        doc.set_selection(view.id, selection);
         align_view(doc, view, Align::Center);
     };
 }
@@ -4080,35 +4106,35 @@ fn rotate_view(cx: &mut Context) {
 }
 
 fn jump_view_right(cx: &mut Context) {
-    cx.editor.focus_right()
+    cx.editor.focus_direction(tree::Direction::Right)
 }
 
 fn jump_view_left(cx: &mut Context) {
-    cx.editor.focus_left()
+    cx.editor.focus_direction(tree::Direction::Left)
 }
 
 fn jump_view_up(cx: &mut Context) {
-    cx.editor.focus_up()
+    cx.editor.focus_direction(tree::Direction::Up)
 }
 
 fn jump_view_down(cx: &mut Context) {
-    cx.editor.focus_down()
+    cx.editor.focus_direction(tree::Direction::Down)
 }
 
 fn swap_view_right(cx: &mut Context) {
-    cx.editor.swap_right()
+    cx.editor.swap_split_in_direction(tree::Direction::Right)
 }
 
 fn swap_view_left(cx: &mut Context) {
-    cx.editor.swap_left()
+    cx.editor.swap_split_in_direction(tree::Direction::Left)
 }
 
 fn swap_view_up(cx: &mut Context) {
-    cx.editor.swap_up()
+    cx.editor.swap_split_in_direction(tree::Direction::Up)
 }
 
 fn swap_view_down(cx: &mut Context) {
-    cx.editor.swap_down()
+    cx.editor.swap_split_in_direction(tree::Direction::Down)
 }
 
 fn transpose_view(cx: &mut Context) {
@@ -4225,26 +4251,33 @@ fn scroll_down(cx: &mut Context) {
     scroll(cx, cx.count(), Direction::Forward);
 }
 
-fn goto_ts_object_impl(cx: &mut Context, object: &str, direction: Direction) {
+fn goto_ts_object_impl(cx: &mut Context, object: &'static str, direction: Direction) {
     let count = cx.count();
-    let (view, doc) = current!(cx.editor);
-    let text = doc.text().slice(..);
-    let range = doc.selection(view.id).primary();
+    let motion = move |editor: &mut Editor| {
+        let (view, doc) = current!(editor);
+        if let Some((lang_config, syntax)) = doc.language_config().zip(doc.syntax()) {
+            let text = doc.text().slice(..);
+            let root = syntax.tree().root_node();
 
-    let new_range = match doc.language_config().zip(doc.syntax()) {
-        Some((lang_config, syntax)) => movement::goto_treesitter_object(
-            text,
-            range,
-            object,
-            direction,
-            syntax.tree().root_node(),
-            lang_config,
-            count,
-        ),
-        None => range,
+            let selection = doc.selection(view.id).clone().transform(|range| {
+                movement::goto_treesitter_object(
+                    text,
+                    range,
+                    object,
+                    direction,
+                    root,
+                    lang_config,
+                    count,
+                )
+            });
+
+            doc.set_selection(view.id, selection);
+        } else {
+            editor.set_status("Syntax-tree is not available in current buffer");
+        }
     };
-
-    doc.set_selection(view.id, Selection::single(new_range.anchor, new_range.head));
+    motion(cx.editor);
+    cx.editor.last_motion = Some(Motion(Box::new(motion)));
 }
 
 fn goto_next_function(cx: &mut Context) {
@@ -4332,10 +4365,12 @@ fn select_textobject(cx: &mut Context, objtype: textobject::TextObject) {
                         'o' => textobject_treesitter("comment", range),
                         't' => textobject_treesitter("test", range),
                         'p' => textobject::textobject_paragraph(text, range, objtype, count),
-                        'm' => textobject::textobject_surround_closest(text, range, objtype, count),
+                        'm' => textobject::textobject_pair_surround_closest(
+                            text, range, objtype, count,
+                        ),
                         // TODO: cancel new ranges if inconsistent surround matches across lines
                         ch if !ch.is_ascii_alphanumeric() => {
-                            textobject::textobject_surround(text, range, objtype, ch, count)
+                            textobject::textobject_pair_surround(text, range, objtype, ch, count)
                         }
                         _ => range,
                     }
@@ -4361,7 +4396,7 @@ fn select_textobject(cx: &mut Context, objtype: textobject::TextObject) {
             ("a", "Argument/parameter (tree-sitter)"),
             ("o", "Comment (tree-sitter)"),
             ("t", "Test (tree-sitter)"),
-            ("m", "Matching delimiter under cursor"),
+            ("m", "Closest surrounding pair to cursor"),
             (" ", "... or any character acting as a pair"),
         ];
 
@@ -4578,8 +4613,18 @@ fn shell_impl(
     }
     let output = process.wait_with_output()?;
 
-    if !output.stderr.is_empty() {
-        log::error!("Shell error: {}", String::from_utf8_lossy(&output.stderr));
+    if !output.status.success() {
+        if !output.stderr.is_empty() {
+            let err = String::from_utf8_lossy(&output.stderr).to_string();
+            log::error!("Shell error: {}", err);
+            bail!("Shell error: {}", err);
+        }
+        bail!("Shell command failed");
+    } else if !output.stderr.is_empty() {
+        log::debug!(
+            "Command printed to stderr: {}",
+            String::from_utf8_lossy(&output.stderr).to_string()
+        );
     }
 
     let str = std::str::from_utf8(&output.stdout)
@@ -4846,7 +4891,7 @@ fn replay_macro(cx: &mut Context) {
     cx.callback = Some(Box::new(move |compositor, cx| {
         for _ in 0..count {
             for &key in keys.iter() {
-                compositor.handle_event(compositor::Event::Key(key), cx);
+                compositor.handle_event(&compositor::Event::Key(key), cx);
             }
         }
         // The macro under replay is cleared at the end of the callback, not in the
