@@ -101,7 +101,7 @@ impl Prompt {
     }
 
     /// Compute the cursor position after applying movement
-    /// Taken from: https://github.com/wez/wezterm/blob/e0b62d07ca9bf8ce69a61e30a3c20e7abc48ce7e/termwiz/src/lineedit/mod.rs#L516-L611
+    /// Taken from: <https://github.com/wez/wezterm/blob/e0b62d07ca9bf8ce69a61e30a3c20e7abc48ce7e/termwiz/src/lineedit/mod.rs#L516-L611>
     fn eval_movement(&self, movement: Movement) -> usize {
         match movement {
             Movement::BackwardChar(rep) => {
@@ -533,18 +533,24 @@ impl Component for Prompt {
                 if self.selection.is_some() && self.line.ends_with(std::path::MAIN_SEPARATOR) {
                     self.recalculate_completion(cx.editor);
                 } else {
+                    let last_item = self
+                        .history_register
+                        .and_then(|reg| cx.editor.registers.last(reg).cloned())
+                        .map(|entry| entry.into())
+                        .unwrap_or_else(|| Cow::from(""));
+
                     // handle executing with last command in history if nothing entered
                     let input: Cow<str> = if self.line.is_empty() {
-                        // latest value in the register list
-                        self.history_register
-                            .and_then(|reg| cx.editor.registers.last(reg).cloned())
-                            .map(|entry| entry.into())
-                            .unwrap_or_else(|| Cow::from(""))
+                        last_item
                     } else {
-                        if let Some(register) = self.history_register {
+                        if last_item != self.line {
                             // store in history
-                            let register = cx.editor.registers.get_mut(register);
-                            register.push(self.line.clone());
+                            if let Some(register) = self.history_register {
+                                cx.editor
+                                    .registers
+                                    .get_mut(register)
+                                    .push(self.line.clone());
+                            };
                         }
 
                         self.line.as_str().into()
