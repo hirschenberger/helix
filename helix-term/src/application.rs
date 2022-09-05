@@ -195,7 +195,7 @@ impl Application {
                         // `--vsplit` or `--hsplit` are used, the file which is
                         // opened last is focused on.
                         let view_id = editor.tree.focus;
-                        let doc = editor.document_mut(doc_id).unwrap();
+                        let doc = doc_mut!(editor, &doc_id);
                         let pos = Selection::point(pos_at_coords(doc.text().slice(..), pos, true));
                         doc.set_selection(view_id, pos);
                     }
@@ -505,8 +505,13 @@ impl Application {
                             let language_id =
                                 doc.language_id().map(ToOwned::to_owned).unwrap_or_default();
 
+                            let url = match doc.url() {
+                                Some(url) => url,
+                                None => continue, // skip documents with no path
+                            };
+
                             tokio::spawn(language_server.text_document_did_open(
-                                doc.url().unwrap(),
+                                url,
                                 doc.version(),
                                 doc.text(),
                                 language_id,
