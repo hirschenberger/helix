@@ -53,6 +53,7 @@
 | javascript | ✓ | ✓ | ✓ | `typescript-language-server` |
 | jsdoc | ✓ |  |  |  |
 | json | ✓ |  | ✓ | `vscode-json-language-server` |
+| jsonnet | ✓ |  |  |  |
 | jsx | ✓ | ✓ | ✓ | `typescript-language-server` |
 | julia | ✓ |  |  | `julia` |
 | kotlin | ✓ |  |  | `kotlin-language-server` |
@@ -95,6 +96,7 @@
 | scheme | ✓ |  |  |  |
 | scss | ✓ |  |  | `vscode-css-language-server` |
 | slint | ✓ |  | ✓ | `slint-lsp` |
+| sml | ✓ |  |  |  |
 | solidity | ✓ |  |  | `solc` |
 | sql | ✓ |  |  |  |
 | sshclientconfig | ✓ |  |  |  |
