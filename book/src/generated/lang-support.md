@@ -29,7 +29,7 @@
 | esdl | ✓ |  |  |  |
 | fish | ✓ | ✓ | ✓ |  |
 | fortran | ✓ |  | ✓ | `fortls` |
-| gdscript | ✓ |  |  |  |
+| gdscript | ✓ | ✓ |  |  |
 | git-attributes | ✓ |  |  |  |
 | git-commit | ✓ |  |  |  |
 | git-config | ✓ |  |  |  |
@@ -38,6 +38,7 @@
 | gleam | ✓ | ✓ |  | `gleam` |
 | glsl | ✓ | ✓ | ✓ |  |
 | go | ✓ | ✓ | ✓ | `gopls` |
+| godot-resource | ✓ |  |  |  |
 | gomod | ✓ |  |  | `gopls` |
 | gotmpl | ✓ |  |  | `gopls` |
 | gowork | ✓ |  |  | `gopls` |
@@ -53,7 +54,7 @@
 | javascript | ✓ | ✓ | ✓ | `typescript-language-server` |
 | jsdoc | ✓ |  |  |  |
 | json | ✓ |  | ✓ | `vscode-json-language-server` |
-| jsonnet | ✓ |  |  |  |
+| jsonnet | ✓ |  |  | `jsonnet-language-server` |
 | jsx | ✓ | ✓ | ✓ | `typescript-language-server` |
 | julia | ✓ |  |  | `julia` |
 | kotlin | ✓ |  |  | `kotlin-language-server` |
@@ -75,7 +76,7 @@
 | ocaml | ✓ |  | ✓ | `ocamllsp` |
 | ocaml-interface | ✓ |  |  | `ocamllsp` |
 | odin | ✓ |  |  | `ols` |
-| openscad | ✓ |  |  | `openscad-language-server` |
+| openscad | ✓ |  |  | `openscad-lsp` |
 | org | ✓ |  |  |  |
 | pascal | ✓ | ✓ |  | `pasls` |
 | perl | ✓ | ✓ | ✓ |  |
